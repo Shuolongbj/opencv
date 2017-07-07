@@ -1726,3 +1726,29 @@ TEST(Core_Mat_array, SplitMerge)
     }
 }
 #endif
+
+TEST(Mat, regression_8680)
+{
+   Mat_<Point2i> mat(3,1);
+   ASSERT_EQ(mat.channels(), 2);
+   mat.release();
+   ASSERT_EQ(mat.channels(), 2);
+}
+
+#ifdef CV_CXX_11
+
+TEST(Mat_, range_based_for)
+{
+    Mat_<uchar> img = Mat_<uchar>::zeros(3, 3);
+
+    for(auto& pixel : img)
+    {
+        pixel = 1;
+    }
+
+    Mat_<uchar> ref(3, 3);
+    ref.setTo(Scalar(1));
+    ASSERT_DOUBLE_EQ(norm(img, ref), 0.);
+}
+
+#endif

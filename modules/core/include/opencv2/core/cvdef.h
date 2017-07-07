@@ -63,10 +63,6 @@
 #endif
 
 
-#if !defined _CRT_SECURE_NO_DEPRECATE && defined _MSC_VER && _MSC_VER > 1300
-#  define _CRT_SECURE_NO_DEPRECATE /* to avoid multiple Visual Studio warnings */
-#endif
-
 // undef problematic defines sometimes defined by system headers (windows.h in particular)
 #undef small
 #undef min
@@ -178,7 +174,7 @@ enum CpuFeatures {
 
 /* fundamental constants */
 #define CV_PI   3.1415926535897932384626433832795
-#define CV_2PI 6.283185307179586476925286766559
+#define CV_2PI  6.283185307179586476925286766559
 #define CV_LOG2 0.69314718055994530941723212145818
 
 #if defined __ARM_FP16_FORMAT_IEEE \
@@ -303,6 +299,18 @@ Cv64suf;
 #endif
 
 /****************************************************************************************\
+*                                    static analysys                                     *
+\****************************************************************************************/
+
+// In practice, some macro are not processed correctly (noreturn is not detected).
+// We need to use simplified definition for them.
+#ifndef CV_STATIC_ANALYSIS
+# if defined(__KLOCWORK__) || defined(__clang_analyzer__) || defined(__COVERITY__)
+#   define CV_STATIC_ANALYSIS
+# endif
+#endif
+
+/****************************************************************************************\
 *          exchange-add operation for atomic operations on reference counters            *
 \****************************************************************************************/
 
@@ -342,6 +350,20 @@ Cv64suf;
 #    define CV_NORETURN __declspec(noreturn)
 #  else
 #    define CV_NORETURN /* nothing by default */
+#  endif
+#endif
+
+
+/****************************************************************************************\
+*                                    C++ 11                                              *
+\****************************************************************************************/
+#ifndef CV_CXX_11
+#  if __cplusplus >= 201103L || defined(_MSC_VER) && _MSC_VER >= 1600
+#    define CV_CXX_11 1
+#  endif
+#else
+#  if CV_CXX_11 == 0
+#    undef CV_CXX_11
 #  endif
 #endif
 
