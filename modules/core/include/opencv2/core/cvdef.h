@@ -48,6 +48,23 @@
 //! @addtogroup core_utils
 //! @{
 
+#if !defined CV_DOXYGEN && !defined CV_IGNORE_DEBUG_BUILD_GUARD
+#if (defined(_MSC_VER) && (defined(DEBUG) || defined(_DEBUG))) || \
+    (defined(_GLIBCXX_DEBUG) || defined(_GLIBCXX_DEBUG_PEDANTIC))
+// Guard to prevent using of binary incompatible binaries / runtimes
+// https://github.com/opencv/opencv/pull/9161
+#define CV__DEBUG_NS_BEGIN namespace debug_build_guard {
+#define CV__DEBUG_NS_END }
+namespace cv { namespace debug_build_guard { } using namespace debug_build_guard; }
+#endif
+#endif
+
+#ifndef CV__DEBUG_NS_BEGIN
+#define CV__DEBUG_NS_BEGIN
+#define CV__DEBUG_NS_END
+#endif
+
+
 #ifdef __OPENCV_BUILD
 #include "cvconfig.h"
 #endif
@@ -357,13 +374,13 @@ Cv64suf;
 /****************************************************************************************\
 *                                    C++ 11                                              *
 \****************************************************************************************/
-#ifndef CV_CXX_11
-#  if __cplusplus >= 201103L || defined(_MSC_VER) && _MSC_VER >= 1600
-#    define CV_CXX_11 1
+#ifndef CV_CXX11
+#  if __cplusplus >= 201103L || (defined(_MSC_VER) && _MSC_VER >= 1800)
+#    define CV_CXX11 1
 #  endif
 #else
-#  if CV_CXX_11 == 0
-#    undef CV_CXX_11
+#  if CV_CXX11 == 0
+#    undef CV_CXX11
 #  endif
 #endif
 
@@ -373,7 +390,7 @@ Cv64suf;
 \****************************************************************************************/
 
 #ifndef CV_CXX_MOVE_SEMANTICS
-#  if __cplusplus >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__) || defined(_MSC_VER) && _MSC_VER >= 1600
+#  if __cplusplus >= 201103L || defined(__GXX_EXPERIMENTAL_CXX0X__) || (defined(_MSC_VER) && _MSC_VER >= 1600)
 #    define CV_CXX_MOVE_SEMANTICS 1
 #  elif defined(__clang)
 #    if __has_feature(cxx_rvalue_references)
