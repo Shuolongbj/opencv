@@ -78,7 +78,7 @@ unset(OPENCV_WORLD_MODULES CACHE)
 # Usage:
 #   add_dependencies(opencv_<name> [REQUIRED] [<list of dependencies>] [OPTIONAL <list of modules>] [WRAP <list of wrappers>])
 # Notes:
-# * <list of dependencies> - can include full names of modules or full pathes to shared/static libraries or cmake targets
+# * <list of dependencies> - can include full names of modules or full paths to shared/static libraries or cmake targets
 macro(ocv_add_dependencies full_modname)
   ocv_debug_message("ocv_add_dependencies(" ${full_modname} ${ARGN} ")")
   #we don't clean the dependencies here to allow this macro several times for every module
@@ -138,7 +138,7 @@ macro(ocv_add_module _name)
 
   # the first pass - collect modules info, the second pass - create targets
   if(OPENCV_INITIAL_PASS)
-    #guard agains redefinition
+    #guard against redefinition
     if(";${OPENCV_MODULES_BUILD};${OPENCV_MODULES_DISABLED_USER};" MATCHES ";${the_module};")
       message(FATAL_ERROR "Redefinition of the ${the_module} module.
   at:                    ${CMAKE_CURRENT_SOURCE_DIR}
@@ -407,7 +407,7 @@ function(__ocv_sort_modules_by_deps __lst)
             break()
           endif()
         endforeach()
-        # chek if all dependencies for this module has been resolved
+        # check if all dependencies for this module has been resolved
         if (NOT unresolved_deps_found)
           list(APPEND result ${m})
           list(REMOVE_ITEM input ${m})
@@ -1221,9 +1221,13 @@ function(ocv_add_samples)
   ocv_debug_message("ocv_add_samples(" ${ARGN} ")")
 
   set(samples_path "${CMAKE_CURRENT_SOURCE_DIR}/samples")
+  if(NOT EXISTS "${samples_path}")
+    return()
+  endif()
+
   string(REGEX REPLACE "^opencv_" "" module_id ${the_module})
 
-  if(BUILD_EXAMPLES AND EXISTS "${samples_path}")
+  if(BUILD_EXAMPLES)
     set(samples_deps ${the_module} ${OPENCV_MODULE_${the_module}_DEPS} opencv_imgcodecs opencv_videoio opencv_highgui ${ARGN})
     ocv_check_dependencies(${samples_deps})
 
@@ -1237,17 +1241,23 @@ function(ocv_add_samples)
         ocv_add_executable(${the_target} "${source}")
         ocv_target_include_modules(${the_target} ${samples_deps})
         ocv_target_link_libraries(${the_target} LINK_PRIVATE ${samples_deps})
-        set_target_properties(${the_target} PROPERTIES PROJECT_LABEL "(sample) ${name}")
 
-        set_target_properties(${the_target} PROPERTIES LABELS "${OPENCV_MODULE_${the_module}_LABEL};Sample")
-        set_source_files_properties("${source}"
-          PROPERTIES LABELS "${OPENCV_MODULE_${the_module}_LABEL};Sample")
-
+        set_target_properties(${the_target} PROPERTIES
+          PROJECT_LABEL "(sample) ${name}"
+          LABELS "${OPENCV_MODULE_${the_module}_LABEL};Sample")
+        set_source_files_properties("${source}" PROPERTIES
+          LABELS "${OPENCV_MODULE_${the_module}_LABEL};Sample")
         if(ENABLE_SOLUTION_FOLDERS)
           set_target_properties(${the_target} PROPERTIES
-            OUTPUT_NAME "${module_id}-example-${name}"
             FOLDER "samples/${module_id}")
         endif()
+        # Add single target to build all samples for the module: 'make opencv_samples_bioinspired'
+        set(parent_target opencv_samples_${module_id})
+        if(NOT TARGET ${parent_target})
+          add_custom_target(${parent_target})
+          add_dependencies(opencv_samples ${parent_target})
+        endif()
+        add_dependencies(${parent_target} ${the_target})
 
         if(WIN32)
           install(TARGETS ${the_target} RUNTIME DESTINATION "samples/${module_id}" COMPONENT samples)
@@ -1256,8 +1266,8 @@ function(ocv_add_samples)
     endif()
   endif()
 
-  if(INSTALL_C_EXAMPLES AND NOT WIN32 AND EXISTS "${samples_path}")
-  file(GLOB DEPLOY_FILES_AND_DIRS "${samples_path}/*")
+  if(INSTALL_C_EXAMPLES)
+    file(GLOB DEPLOY_FILES_AND_DIRS "${samples_path}/*")
     foreach(ITEM ${DEPLOY_FILES_AND_DIRS})
         IF( IS_DIRECTORY "${ITEM}" )
             LIST( APPEND sample_dirs "${ITEM}" )
@@ -1266,10 +1276,10 @@ function(ocv_add_samples)
         ENDIF()
     endforeach()
     install(FILES ${sample_files}
-            DESTINATION ${OPENCV_SAMPLES_SRC_INSTALL_PATH}/${module_id}
-            PERMISSIONS OWNER_READ GROUP_READ WORLD_READ COMPONENT samples)
+            DESTINATION "${OPENCV_SAMPLES_SRC_INSTALL_PATH}/${module_id}"
+            COMPONENT samples)
     install(DIRECTORY ${sample_dirs}
-            DESTINATION ${OPENCV_SAMPLES_SRC_INSTALL_PATH}/${module_id}
-            USE_SOURCE_PERMISSIONS COMPONENT samples)
+            DESTINATION "${OPENCV_SAMPLES_SRC_INSTALL_PATH}/${module_id}"
+            COMPONENT samples)
   endif()
 endfunction()

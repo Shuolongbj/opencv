@@ -14,7 +14,7 @@ Test for Tensorflow models loading
 #include <opencv2/core/ocl.hpp>
 #include <opencv2/ts/ocl_test.hpp>
 
-namespace cvtest
+namespace opencv_test
 {
 
 using namespace cv;
@@ -150,6 +150,8 @@ TEST(Test_TensorFlow, batch_norm)
     runTensorFlowNet("batch_norm");
     runTensorFlowNet("fused_batch_norm");
     runTensorFlowNet("batch_norm_text", DNN_TARGET_CPU, true);
+    runTensorFlowNet("mvn_batch_norm");
+    runTensorFlowNet("mvn_batch_norm_1x1");
 }
 
 OCL_TEST(Test_TensorFlow, batch_norm)
@@ -170,6 +172,10 @@ TEST(Test_TensorFlow, pooling)
 TEST(Test_TensorFlow, deconvolution)
 {
     runTensorFlowNet("deconvolution");
+    runTensorFlowNet("deconvolution_same");
+    runTensorFlowNet("deconvolution_stride_2_same");
+    runTensorFlowNet("deconvolution_adj_pad_valid");
+    runTensorFlowNet("deconvolution_adj_pad_same");
 }
 
 OCL_TEST(Test_TensorFlow, deconvolution)
@@ -281,7 +287,6 @@ TEST(Test_TensorFlow, Inception_v2_SSD)
 
 OCL_TEST(Test_TensorFlow, MobileNet_SSD)
 {
-    throw SkipTestException("TODO: test is failed");
     std::string netPath = findDataFile("dnn/ssd_mobilenet_v1_coco.pb", false);
     std::string netConfig = findDataFile("dnn/ssd_mobilenet_v1_coco.pbtxt", false);
     std::string imgPath = findDataFile("dnn/street.png", false);
@@ -312,8 +317,8 @@ OCL_TEST(Test_TensorFlow, MobileNet_SSD)
     std::vector<Mat> output;
     net.forward(output, outNames);
 
-    normAssert(target[0].reshape(1, 1), output[0].reshape(1, 1));
-    normAssert(target[1].reshape(1, 1), output[1].reshape(1, 1), "", 1e-5, 2e-4);
+    normAssert(target[0].reshape(1, 1), output[0].reshape(1, 1), "", 1e-5, 1.5e-4);
+    normAssert(target[1].reshape(1, 1), output[1].reshape(1, 1), "", 1e-5, 3e-4);
     normAssert(target[2].reshape(1, 1), output[2].reshape(1, 1), "", 4e-5, 1e-2);
 }
 

@@ -42,6 +42,7 @@
 
 #include "../precomp.hpp"
 #include "layers_common.hpp"
+#include "op_inf_engine.hpp"
 #include <float.h>
 #include <algorithm>
 #include <cmath>
@@ -248,6 +249,13 @@ public:
         }
     }
 
+    virtual bool supportBackend(int backendId)
+    {
+        return backendId == DNN_BACKEND_DEFAULT ||
+               backendId == DNN_BACKEND_INFERENCE_ENGINE && haveInfEngine() &&
+              _scales.empty() && !_explicitSizes;
+    }
+
     bool getMemoryShapes(const std::vector<MatShape> &inputs,
                          const int requiredOutputs,
                          std::vector<MatShape> &outputs,
@@ -309,7 +317,17 @@ public:
             variance.copyTo(umat_variance);
 
             int real_numPriors = _numPriors >> (_offsetsX.size() - 1);
-            umat_scales = UMat(1, &real_numPriors, CV_32F, 1.0f);
+            if (_scales.empty())
+            {
+                _scales.resize(real_numPriors, 1.0f);
+                umat_scales = UMat(1, &real_numPriors, CV_32F, 1.0f);
+            }
+            else
+            {
+                CV_Assert(_scales.size() == real_numPriors);
+                Mat scales(1, _scales.size(), CV_32FC1, &_scales[0]);
+                scales.copyTo(umat_scales);
+            }
         }
 
         size_t nthreads = _layerHeight * _layerWidth;
@@ -516,6 +534,43 @@ public:
                 }
             }
         }
+    }
+
+    virtual Ptr<BackendNode> initInfEngine(const std::vector<Ptr<BackendWrapper> >&)
+    {
+#ifdef HAVE_INF_ENGINE
+        InferenceEngine::LayerParams lp;
+        lp.name = name;
+        lp.type = "PriorBox";
+        lp.precision = InferenceEngine::Precision::FP32;
+        std::shared_ptr<InferenceEngine::CNNLayer> ieLayer(new InferenceEngine::CNNLayer(lp));
+
+        ieLayer->params["min_size"] = format("%f", _minSize);
+        ieLayer->params["max_size"] = _maxSize > 0 ? format("%f", _maxSize) : "";
+
+        CV_Assert(!_aspectRatios.empty());
+        ieLayer->params["aspect_ratio"] = format("%f", _aspectRatios[0]);
+        for (int i = 1; i < _aspectRatios.size(); ++i)
+            ieLayer->params["aspect_ratio"] += format(",%f", _aspectRatios[i]);
+
+        ieLayer->params["flip"] = _flip ? "1" : "0";
+        ieLayer->params["clip"] = _clip ? "1" : "0";
+
+        CV_Assert(!_variance.empty());
+        ieLayer->params["variance"] = format("%f", _variance[0]);
+        for (int i = 1; i < _variance.size(); ++i)
+            ieLayer->params["variance"] += format(",%f", _variance[i]);
+
+        ieLayer->params["step"] = _stepX == _stepY ? format("%f", _stepX) : "0";
+        ieLayer->params["step_h"] = _stepY;
+        ieLayer->params["step_w"] = _stepX;
+
+        CV_Assert(_offsetsX.size() == 1, _offsetsY.size() == 1, _offsetsX[0] == _offsetsY[0]);
+        ieLayer->params["offset"] = format("%f", _offsetsX[0]);;
+
+        return Ptr<BackendNode>(new InfEngineBackendNode(ieLayer));
+#endif  // HAVE_INF_ENGINE
+        return Ptr<BackendNode>();
     }
 
     virtual int64 getFLOPS(const std::vector<MatShape> &inputs,
