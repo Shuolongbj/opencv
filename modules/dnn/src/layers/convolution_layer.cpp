@@ -824,14 +824,8 @@ public:
         for (int i = 0; i < inputs.size(); ++i)
             CV_Assert(inputs[i].u != outputs[0].u);
 
-        int inpH = inputs[0].size[2];
-        int inpW = inputs[0].size[3];
-        int out_h = (inpH + 2 * pad.height - (dilation.height * (kernel.height - 1) + 1)) / stride.height + 1;
-        int out_w = (inpW + 2 * pad.width - (dilation.width * (kernel.width - 1) + 1)) / stride.width + 1;
-        if (out_h != outputs[0].size[2] || out_w != outputs[0].size[3])
+        if (padMode == "SAME")
             return false;
-
-        int group = inputs[0].size[1] / umat_blobs[0].size[1];
 
         if (convolutionOp.empty())
         {
@@ -842,7 +836,7 @@ public:
             config.pad = pad;
             config.stride = stride;
             config.dilation = dilation;
-            config.group = group;
+            config.group = inputs[0].size[1] / umat_blobs[0].size[1];
             config.bias_term = (hasBias()) ? true : false;
 
             convolutionOp = Ptr<OCL4DNNConvSpatial<float> >(new OCL4DNNConvSpatial<float>(config));
@@ -858,6 +852,15 @@ public:
             {
                 reluslope.assign(outCn+2, activ_relu->negativeSlope);
                 activType = OCL4DNN_CONV_FUSED_ACTIV_RELU;
+            }
+
+            Ptr<ReLU6Layer> activ_relu6 = activ.dynamicCast<ReLU6Layer>();
+            if( !activ_relu6.empty() )
+            {
+                reluslope.resize(2);
+                reluslope[0] = activ_relu6->minValue;
+                reluslope[1] = activ_relu6->maxValue;
+                activType = OCL4DNN_CONV_FUSED_ACTIV_RELU6;
             }
 
             Ptr<ChannelsPReLULayer> activ_chprelu = activ.dynamicCast<ChannelsPReLULayer>();
@@ -906,12 +909,17 @@ public:
             {
                 convolutionOp->setActivTanh(true);
             }
+            else if ( activType == OCL4DNN_CONV_FUSED_ACTIV_RELU6)
+            {
+                convolutionOp->setActivReLU6(true, reluslope[0], reluslope[1]);
+            }
             else
             {
                 convolutionOp->setActivReLU(false, 0);
                 convolutionOp->setActivPReLU(false, reluslope);
                 convolutionOp->setActivPower(false, 1.f);
                 convolutionOp->setActivTanh(false);
+                convolutionOp->setActivReLU6(false, 0, 0);
             }
             newActiv = false;
         }
@@ -1382,8 +1390,8 @@ public:
                 {
                     int total = outGroupCn * decnBlob.cols;
                     int index = 0;
-                    int height_col = (outH + 2 * pad.height - kernel.height) / stride.height + 1;
-                    int width_col = (outW + 2 * pad.width - kernel.width) / stride.width + 1;
+                    int height_col = inpH;
+                    int width_col = inpW;
                     int coeff_h = (1 - stride.height * kernel.width * height_col) * width_col;
                     int coeff_w = (1 - stride.width * height_col * width_col);
 
